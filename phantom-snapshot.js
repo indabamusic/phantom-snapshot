@@ -9,8 +9,10 @@ var phantomSnapshot = function(options) {
 
   phantomSnapshot.options = options || {};
 
-  phantomSnapshot.options.dir        = phantomSnapshot.options.dir || './snapshots';
-  phantomSnapshot.options.scriptPath = phantomSnapshot.options.scriptPath || path.join(__dirname, 'phantom-script.js');
+  phantomSnapshot.options.dir         = phantomSnapshot.options.dir         || './snapshots';
+  phantomSnapshot.options.maxAge      = phantomSnapshot.options.maxAge      || 1000 * 60 * 2;
+  phantomSnapshot.options.scriptPath  = phantomSnapshot.options.scriptPath  || path.join(__dirname, 'phantom-script.js');
+
 
   return function(req, resp, next) {
     var snapshotMatch = req.url.match(/^\/snapshot(\/.*)/)
@@ -21,6 +23,7 @@ var phantomSnapshot = function(options) {
 
     } else if (typeof(req.query._escaped_fragment_) != 'undefined') {
       phantomSnapshot.getSnapshot(snapshotDomain, phantomSnapshot.stripFragment(req.url)).then(function(file_path) {
+        // TODO: Set headers for caching this response?
         resp.sendFile(file_path).end();
       }, function(err) {
         next();
@@ -49,15 +52,25 @@ phantomSnapshot.getSnapshot = function(page_domain, page_path, create_new) {
 
   var file_path = phantomSnapshot.options.dir + '/' + phantomSnapshot.getFileName(page_path);
 
-  fs.exists(file_path, function(exists) {
-    if (exists) {
-      deferred.resolve(file_path);
-    } else {
+  var now = Date.now();
+
+  fs.stat(file_path, function(err, stat) {
+    var expiresAt = stat.mtime.getTime() + phantomSnapshot.options.maxAge;
+    // if file does not exist, or if file is older than maxAge
+    if ((err && err.code === 'ENOENT') || (now >= expiresAt)) {
+      if (err && err.code === 'ENOENT') {
+        console.log('File doesnt exist!');
+      } else {
+        console.log('File expired '+((now - expiresAt)/1000)+'s ago');
+      }
       phantomSnapshot.snap(page_domain, page_path).then(function(file_path) {
         deferred.resolve(file_path);
       }, function(err) {
         deferred.reject(err);
       });
+    } else {
+      console.log('Still Good for '+((expiresAt - now)/1000)+'s');
+      deferred.resolve(file_path);
     }
   });
 
