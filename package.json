@@ -13,6 +13,7 @@
   "repository": "indabamusic/phantom-snapshot",
   "license": "MIT",
   "dependencies": {
-    "phantomjs": "^1.9.8"    
+    "phantomjs": "^1.9.8",
+    "q": "~1.0.0"
   }
 }
