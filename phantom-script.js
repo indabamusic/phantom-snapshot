@@ -1,13 +1,14 @@
 var page = require('webpage').create()
   , system = require('system')
   , fs = require('fs')
+  , t = Date.now();
 
-  , t = Date.now()
 
 if (system.args.length < 3) {
   throw new Error('Usage: phantom.js <some URL> <output directory> <output file name>');
   phantom.exit(0);
 }
+
 
 var url = system.args[1]
   , dir = system.args[2] || 'snapshots'
