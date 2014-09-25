@@ -1,7 +1,7 @@
 {
   "name": "phantom-snapshot",
   "description": "Node module for Angular SEO.",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "author": "Ethan Fuchs <ethan.fuchs@gmail.com>",
   "keywords": [
     "web",

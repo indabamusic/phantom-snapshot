@@ -5,18 +5,35 @@ var page = require('webpage').create()
 
 
 if (system.args.length < 3) {
-  throw new Error('Usage: phantom.js <some URL> <output directory> <output file name>');
+  throw new Error('Usage: phantom.js <some URL> <output directory> <output file name> <screenshot[="width"x"height"]>');
   phantom.exit(0);
 }
 
 
 var url = system.args[1]
   , dir = system.args[2] || 'snapshots'
-  , out = system.args[3];
+  , out = system.args[3]
+  , scr = system.args[4]
 
+  , viewportWidth = 1024
+  , viewportHeight = 768;
+
+
+if (scr && scr.match(/^screenshot/)) {
+  var scrMatch = scr.match(/^screenshot=([0-9]+)_([0-9]+)/);
+  if (scrMatch) {
+    viewportWidth = scrMatch[1];
+    viewportHeight = scrMatch[2];
+  }
+  scr = true;
+} else {
+  scr = false;
+}
+
+page.viewportSize = { width: viewportWidth, height: viewportHeight };
 
 page.settings.userAgent = 'PhantomJS';
-page.settings.loadImages = false;
+page.settings.loadImages = true;
 page.settings.localToRemoteUrlAccessEnabled = true;
 
 
@@ -30,7 +47,7 @@ function parseURL(page_url) {
     file:   (function(page_path){
       page_path = page_path.replace(/[:\/-]+/g,'_');
       page_path = page_path.replace(/^_/,'');
-      page_path = ((page_path || 'index') + '.html');
+      page_path = (page_path || 'index');
       return page_path;
     }(url_parts[2]))
   }
@@ -78,11 +95,18 @@ page.open(url, function(status) {
     }, parsedURL.domain);
 
     setTimeout(function() {
-      var file = dir + '/' + parsedURL.file;
-      if (fs.exists(file)) fs.remove(file);
-      fs.write(file, content, 'w');
-      console.log(file);
-      phantom.exit(file);
+      var html_file = dir + '/' + parsedURL.file + '.html',
+          img_file = dir + '/' + parsedURL.file + '.png';
+
+      if (fs.exists(html_file)) fs.remove(html_file);
+      if (fs.exists(img_file)) fs.remove(img_file);
+
+      fs.write(html_file, content, 'w');
+
+      if (scr) page.render(img_file, { format: "png" });
+
+      console.log(html_file);
+      phantom.exit(html_file);
     }, 3000);
   }
 });

@@ -17,8 +17,8 @@ var phantomSnapshot = function(options) {
     , maxAge:         1000 * 60 * 2
     , scriptPath:     path.join(__dirname, 'phantom-script.js')
     , screenshot:     false
-    , viewportWidth:  1024
-    , viewportHeight: 768
+    , viewportWidth:  null
+    , viewportHeight: null
   });
 
   logEnabled = (typeof(console) != 'undefined' && phantomSnapshot.options.verbose);
@@ -113,8 +113,20 @@ phantomSnapshot.snap = function(page_domain, page_path) {
     phantomSnapshot.options.scriptPath,
     page_domain + page_path,
     phantomSnapshot.options.dir,
-    phantomSnapshot.getFileName(page_path)
+    phantomSnapshot.getFileName(page_path),
+    (function(){
+      var scr = "";
+      if (phantomSnapshot.options.screenshot) {
+        scr += "screenshot";
+        if (phantomSnapshot.options.viewportWidth && phantomSnapshot.options.viewportHeight) {
+          scr += ("=" + phantomSnapshot.options.viewportWidth + "_" + phantomSnapshot.options.viewportHeight);
+        }
+      }
+      return scr;
+    }())
   ].join(' ');
+
+  logMsg('snap: - ' + cmd);
 
   childProcess.exec(cmd, {}, function(err, stdout, stderr) {
     if (err) {
