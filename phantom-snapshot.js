@@ -2,16 +2,39 @@ var phantomjs = require('phantomjs')
   , path = require('path')
   , childProcess = require('child_process')
   , fs = require('fs')
-  , Q = require('q');
+  , Q = require('q')
+  , _ = require('underscore')
+
+  logEnabled = false;
 
 
 var phantomSnapshot = function(options) {
 
-  phantomSnapshot.options = options || {};
+  phantomSnapshot.options = _.defaults(options || {}, {
+      verbose:        false
+    , cleanOnStart:   false
+    , dir:            './snapshots'
+    , maxAge:         1000 * 60 * 2
+    , scriptPath:     path.join(__dirname, 'phantom-script.js')
+    , screenshot:     false
+    , viewportWidth:  1024
+    , viewportHeight: 768
+  });
 
-  phantomSnapshot.options.dir         = phantomSnapshot.options.dir         || './snapshots';
-  phantomSnapshot.options.maxAge      = phantomSnapshot.options.maxAge      || 1000 * 60 * 2;
-  phantomSnapshot.options.scriptPath  = phantomSnapshot.options.scriptPath  || path.join(__dirname, 'phantom-script.js');
+  logEnabled = (typeof(console) != 'undefined' && phantomSnapshot.options.verbose);
+
+  console.log('phantomSnapshot initialized');
+
+  logMsg('options:\n >',
+      _.chain(phantomSnapshot.options)
+        .pairs()
+        .collect(function(pair) {
+          return  pair[0] + " : " + pair[1];
+        })
+        .value()
+        .join("\n > ")
+  );
+
 
 
   return function(req, resp, next) {
@@ -39,10 +62,10 @@ var phantomSnapshot = function(options) {
   
 phantomSnapshot.snapRequest = function(page_domain, page_path, req, resp, next) {
   phantomSnapshot.snap(page_domain, page_path).then(function(file_path) {
-    console.log('Snapshot Success ' + file_path);
+    logMsg('snapRequest: snapshot success ' + file_path);
     resp.redirect(301, page_path);
   }, function(err) {
-    console.error('Snapshot Failure - ' + err);
+    logErr('snapRequest: snapshot failure - ' + err);
     resp.redirect(301, page_path);
   });
 };
@@ -55,21 +78,23 @@ phantomSnapshot.getSnapshot = function(page_domain, page_path, create_new) {
   var now = Date.now();
 
   fs.stat(file_path, function(err, stat) {
-    var expiresAt = stat.mtime.getTime() + phantomSnapshot.options.maxAge;
+    var expiresAt = stat ? (stat.mtime.getTime() + phantomSnapshot.options.maxAge) : now;
     // if file does not exist, or if file is older than maxAge
     if ((err && err.code === 'ENOENT') || (now >= expiresAt)) {
       if (err && err.code === 'ENOENT') {
-        console.log('File doesnt exist!');
+        logMsg('getSnapshot: file doesnt exist - ' + file_path);
       } else {
-        console.log('File expired '+((now - expiresAt)/1000)+'s ago');
+        logMsg('getSnapshot: file expired '+((now - expiresAt)/1000)+'s ago - ' + file_path);
       }
       phantomSnapshot.snap(page_domain, page_path).then(function(file_path) {
+        logMsg('getSnapshot: snap success - ' + file_path);
         deferred.resolve(file_path);
       }, function(err) {
+        logErr('getSnapshot: snap failure - ' + err);
         deferred.reject(err);
       });
     } else {
-      console.log('Still Good for '+((expiresAt - now)/1000)+'s');
+      logMsg('getSnapshot: still good for '+((expiresAt - now)/1000)+'s - ' + file_path);
       deferred.resolve(file_path);
     }
   });
@@ -91,9 +116,6 @@ phantomSnapshot.snap = function(page_domain, page_path) {
   ].join(' ');
 
   childProcess.exec(cmd, {}, function(err, stdout, stderr) {
-    if (stdout) console.log(stdout);
-    if (stderr) console.error(stderr);
-
     if (err) {
       deferred.reject(err);
     } else {
@@ -119,3 +141,16 @@ phantomSnapshot.getFileName = function(page_path) {
 
 
 module.exports = phantomSnapshot;
+
+
+function logMsg() {
+  var args = Array.prototype.slice.call(arguments, 0);
+  args.unshift('phantomSnapshot: ');
+  if (logEnabled) console.log.apply(this, args);
+}
+
+function logErr() {
+  var args = Array.prototype.slice.call(arguments, 0);
+  args.unshift('phantomSnapshot: ');
+  if (logEnabled) console.error.apply(this, args);
+}
