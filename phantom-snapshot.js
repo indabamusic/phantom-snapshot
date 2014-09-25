@@ -5,14 +5,20 @@ var phantomjs = require('phantomjs')
   , Q = require('q')
   , _ = require('underscore')
 
-  logEnabled = false;
+  , logEnabled = false
+  , logPrefix = 'Phantom Snapshot: '
+
+  , userAgent = 'PhantomJS';
 
 
 var phantomSnapshot = function(options) {
 
   phantomSnapshot.options = _.defaults(options || {}, {
       verbose:        false
+    , ignore:         []
     , cleanOnStart:   false
+    , createOnCrawl:  true
+    , createOnView:   false
     , dir:            './snapshots'
     , maxAge:         1000 * 60 * 2
     , scriptPath:     path.join(__dirname, 'phantom-script.js')
@@ -23,7 +29,7 @@ var phantomSnapshot = function(options) {
 
   logEnabled = (typeof(console) != 'undefined' && phantomSnapshot.options.verbose);
 
-  console.log('phantomSnapshot initialized');
+  console.log(logPrefix, 'initialized');
 
   logMsg('options:\n >',
       _.chain(phantomSnapshot.options)
@@ -32,29 +38,45 @@ var phantomSnapshot = function(options) {
           return  pair[0] + " : " + pair[1];
         })
         .value()
-        .join("\n > ")
-  );
+        .join("\n > "));
+
 
   if (phantomSnapshot.options.cleanOnStart) phantomSnapshot.clean();
 
 
   return function(req, resp, next) {
+    if (req.headers && req.headers['user-agent'] && req.headers['user-agent'] == userAgent) return next();
+    if (!req.accepts('html')) return next();
+
+    if (phantomSnapshot.options.ignore) {
+      for (var i = 0; i < phantomSnapshot.options.ignore.length; i++) {
+        if (req.url.match(phantomSnapshot.options.ignore[i])) {
+          return next();
+        }
+      }
+    }
+
+    logMsg('on request - ' + req.url);
+
     var snapshotMatch = req.url.match(/^\/snapshot(\/.*)/)
       , snapshotDomain = req.protocol + '://' + req.headers.host;
 
     if (snapshotMatch) {
       phantomSnapshot.snapRequest(snapshotDomain, snapshotMatch[1], req, resp, next);
 
-    } else if (typeof(req.query._escaped_fragment_) != 'undefined') {
+    } else if (phantomSnapshot.options.createOnCrawl && typeof(req.query._escaped_fragment_) != 'undefined') {  
       phantomSnapshot.getSnapshot(snapshotDomain, phantomSnapshot.stripFragment(req.url)).then(function(file_path) {
         // TODO: Set headers for caching this response?
-        resp.sendFile(file_path).end();
+        return resp.sendFile(file_path).end();
       }, function(err) {
-        next();
+        return next();
       });
 
     } else {
-      next();
+      if (phantomSnapshot.options.createOnView) {
+        phantomSnapshot.getSnapshot(snapshotDomain, phantomSnapshot.stripFragment(req.url))
+      }
+      return next();
 
     }
   }
@@ -126,7 +148,7 @@ phantomSnapshot.snap = function(page_domain, page_path) {
     }())
   ].join(' ');
 
-  logMsg('snap: - ' + cmd);
+  logMsg('snap: command - ' + cmd);
 
   childProcess.exec(cmd, {}, function(err, stdout, stderr) {
     if (err) {
@@ -162,13 +184,13 @@ module.exports = phantomSnapshot;
 
 function logMsg() {
   var args = Array.prototype.slice.call(arguments, 0);
-  args.unshift('phantomSnapshot: ');
+  args.unshift(logPrefix);
   if (logEnabled) console.log.apply(this, args);
 }
 
 function logErr() {
   var args = Array.prototype.slice.call(arguments, 0);
-  args.unshift('phantomSnapshot: ');
+  args.unshift(logPrefix);
   if (logEnabled) console.error.apply(this, args);
 }
 
