@@ -4,9 +4,13 @@ var page = require('webpage').create()
   , t = Date.now();
 
 
+console.error = function () {
+  system.stderr.write(Array.prototype.join.call(arguments, ' ') + '\n');
+};
+
 if (system.args.length < 3) {
-  throw new Error('Usage: phantom.js <some URL> <output directory> <output file name> <screenshot[="width"x"height"]>');
-  phantom.exit(0);
+  console.error('Usage: phantom.js <some URL> <output directory> <output file name> <screenshot[="width"x"height"]>');
+  phantom.exit();
 }
 
 
@@ -55,11 +59,18 @@ function parseURL(page_url) {
 
 page.open(url, function(status) {
   if (status !== 'success') {
-    throw new Error('Unable to access network');
+    console.error('Unable to access network');
     phantom.exit(0);
   } else {
 
-    var parsedURL = parseURL(url);
+    console.error('this is an error');
+
+    var parsedURL = parseURL(url)
+      , html_file = dir + '/' + parsedURL.file + '.html'
+      , img_file = dir + '/' + parsedURL.file + '.png';
+
+    fs.makeDirectory(dir);
+    fs.touch(html_file);
 
     var title = page.evaluate(function() {
       return document.title;
@@ -95,9 +106,6 @@ page.open(url, function(status) {
     }, parsedURL.domain);
 
     setTimeout(function() {
-      var html_file = dir + '/' + parsedURL.file + '.html',
-          img_file = dir + '/' + parsedURL.file + '.png';
-
       if (fs.exists(html_file)) fs.remove(html_file);
       if (fs.exists(img_file)) fs.remove(img_file);
 
