@@ -15,7 +15,7 @@ var phantomSnapshot = function(options) {
 
   phantomSnapshot.options = _.defaults(options || {}, {
       verbose:        false
-    , ignore:         []
+    , ignore:         [/\.(?!html$).*$/i]
     , cleanOnStart:   false
     , createOnCrawl:  true
     , createOnView:   false
