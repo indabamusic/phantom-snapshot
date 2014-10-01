@@ -1,7 +1,8 @@
 var page = require('webpage').create()
   , system = require('system')
   , fs = require('fs')
-  , t = Date.now();
+  , t = Date.now()
+  , ua = 'PhantomJS';
 
 
 console.error = function () {
@@ -36,7 +37,7 @@ if (scr && scr.match(/^screenshot/)) {
 
 page.viewportSize = { width: viewportWidth, height: viewportHeight };
 
-page.settings.userAgent = 'PhantomJS';
+page.settings.userAgent = ua;
 page.settings.loadImages = true;
 page.settings.localToRemoteUrlAccessEnabled = true;
 
@@ -75,10 +76,17 @@ page.open(url, function(status) {
     var title = page.evaluate(function() {
       return document.title;
     });
+    
+    inject_js("if (window) {" +
+              "  if (typeof window.prePhantom === 'function') {" +
+              "    window.prePhantom({" +
+              "        width: '" + viewportWidth + "px'" +
+              "      , height: '" + viewportHeight + "px'" +
+              "    });" +
+              "  }" +
+              "}");
 
     var content = page.evaluate(function (d) {
-      document.getElementById('App').style.visibility = 'visible';
-
       var baseTag = document.createElement('base');
           baseTag.href = d;
 
@@ -96,9 +104,11 @@ page.open(url, function(status) {
       var scripts = document.getElementsByTagName('script');
       if (scripts) {
         for (i=0; i < scripts.length; i++) {
-          // var src = scripts[i].src;
-          //     src = src.replace(/file:\/\/\//, d + '/');
-          scripts[i].src = ''; // src;
+          if (scripts[i].src) {
+            var src = scripts[i].src;
+                src = src.replace(/file:\/\/\//, d + '/');
+            if (src) scripts[i].src = src;
+          }
         }
       }
 
@@ -118,3 +128,12 @@ page.open(url, function(status) {
     }, 3000);
   }
 });
+
+function inject_js(js) {
+  page.evaluate(function(js_code) {
+    var js_block = document.createElement('script');
+        js_block.type = 'text/javascript';
+        js_block.innerHTML = js_code;
+    document.getElementsByTagName('body')[0].appendChild(js_block);
+  }, js);
+}
