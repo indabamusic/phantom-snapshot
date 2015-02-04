@@ -64,7 +64,7 @@ var phantomSnapshot = function(options) {
     if (snapshotMatch) {
       phantomSnapshot.snapRequest(snapshotDomain, snapshotMatch[1], req, resp, next);
 
-    } else if (phantomSnapshot.options.createOnCrawl && typeof(req.query._escaped_fragment_) != 'undefined') {  
+    } else if (phantomSnapshot.options.createOnCrawl && phantomSnapshot.isCrawler(req)) {
       phantomSnapshot.getSnapshot(snapshotDomain, phantomSnapshot.stripFragment(req.url)).then(function(file_path) {
         // TODO: Set headers for caching this response?
         return resp.sendFile(file_path).end();
@@ -172,6 +172,11 @@ phantomSnapshot.getFileName = function(page_path) {
   page_path = page_path.replace(/^_/,'');
   page_path = ((page_path || 'index') + '.html');
   return page_path;
+};
+
+phantomSnapshot.isCrawler = function(req) {
+  return typeof(req.query._escaped_fragment_) != 'undefined'                       // search engine
+      || ~req.headers['user-agent'].toLowerCase().indexOf('facebookexternalhit');  // facebook crawler
 };
 
 phantomSnapshot.clean = function() {
