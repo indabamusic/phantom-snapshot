@@ -175,8 +175,9 @@ phantomSnapshot.getFileName = function(page_path) {
 };
 
 phantomSnapshot.isCrawler = function(req) {
-  return typeof(req.query._escaped_fragment_) != 'undefined'                       // search engine
-      || ~req.headers['user-agent'].toLowerCase().indexOf('facebookexternalhit');  // facebook crawler
+  return typeof(req.query._escaped_fragment_) != 'undefined'                            // search engine
+      || (typeof(req.headers['user-agent']) === 'string'
+          && ~req.headers['user-agent'].toLowerCase().indexOf('facebookexternalhit'));  // facebook crawler
 };
 
 phantomSnapshot.clean = function() {
